@@ -60,6 +60,7 @@ flowchart LR
 | `click` | `click` | no | `url`, `ip`, `impliesOpen: true` (images may have been blocked) |
 | `bounce`, `type: 'bounce'` | `bounce` | `bounce` | `classification` from `bounce_classification` |
 | `bounce`, `type: 'blocked'` | `sender_block` | **no** | The receiver rejected *you* (reputation, content, volume); the address may be fine |
+| `bounce`, `type: 'blocked'`, but the reply says the address doesn't exist | `bounce` | `bounce` | SendGrid files replies it doesn't recognize as blocks, e.g. Proofpoint's `550 #5.1.0 Address rejected.` (see `isUnknownRecipient`) |
 | `dropped`: "Bounced Address", "Invalid" | `dropped` | `bounce` | |
 | `dropped`: "Spam Reporting Address" | `dropped` | `spam_report` | |
 | `dropped`: "Unsubscribed Address", "Group Unsubscribe" | `dropped` | `unsubscribe` | |
@@ -77,7 +78,7 @@ Every result: `{ type, event, at, email, messageId, eventId, ip, url, reason, su
 ```js
 import {
   interpretEvent, interpretEvents, summarize, summarizeBy, applyEvent, emptySummary,
-  verifyEventWebhookSignature, toPublicKey, readerIp, isMachineOpenTime, customArgsOf, messageIdOf
+  verifyEventWebhookSignature, toPublicKey, readerIp, isMachineOpenTime, isUnknownRecipient, customArgsOf, messageIdOf
 } from 'sendgrid-event-kit';
 ```
 
@@ -89,6 +90,7 @@ import {
 | `summarizeBy(events, { key, options })` | `Map` of message id (or `key(result)`) to summary |
 | `applyEvent(summary, result)` / `emptySummary()` | The reducer behind `summarize`, for incremental updates |
 | `verifyEventWebhookSignature({ publicKey, payload, signature, timestamp, toleranceSeconds, now })` | `true` only for a valid signature; never throws |
+| `isUnknownRecipient(reason, classification)` | Whether a rejection says the recipient's address doesn't exist (`5.1.x` address codes or wording like "user unknown"), not that the sender was refused |
 | `readerIp(event)`, `isMachineOpenTime(sentAt, at, windowMs)`, `customArgsOf(event)`, `messageIdOf(event)` | The building blocks |
 
 A summary has `deliveredAt`, `firstOpenAt`, `lastOpenAt`, `humanOpens`, `machineOpens`, `clicks`, `firstClickAt`, `urls`, `readerIps`, `deferrals`, `bouncedAt`/`bounceReason`, `senderBlockedAt`/`senderBlockReason`, `droppedAt`/`dropReason`, `spamReportedAt`, `unsubscribedAt`, the strongest `suppress` seen (spam report > bounce > unsubscribe), and the flags `delivered`, `opened`, `clicked`, `bounced`, `senderBlocked`, `dropped`, `spamReported`, `unsubscribed`. A click counts as opened but not as an extra `humanOpens`. Events with an `sg_event_id` already seen are skipped, since SendGrid delivers at least once.

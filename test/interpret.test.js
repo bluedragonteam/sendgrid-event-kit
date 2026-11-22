@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  customArgsOf, eventTime, interpretEvent, interpretEvents, isMachineOpenTime, messageIdOf, readerIp
+  customArgsOf, eventTime, interpretEvent, interpretEvents, isMachineOpenTime, isUnknownRecipient, messageIdOf, readerIp
 } from '../src/index.js';
 
 const sentAt = new Date('2026-11-20T15:00:00.400Z');
@@ -124,6 +124,36 @@ test('blocked bounce is about the sender: not suppressed', () => {
   assert.equal(result.classification, 'Reputation');
   assert.deepEqual(result.suppress, { address: false, reason: null });
   assert.equal(interpretEvent(base({ event: 'bounce', type: 'blocked' })).reason, 'rejected by the receiving server');
+});
+
+test('blocked bounce that says the address does not exist is a bounce', () => {
+  // Proofpoint's reply for an unknown mailbox, which SendGrid reported as "blocked"
+  const result = interpretEvent(base({ event: 'bounce', type: 'blocked', reason: '550 #5.1.0 Address rejected.' }));
+  assert.equal(result.type, 'bounce');
+  assert.equal(result.reason, '550 #5.1.0 Address rejected.');
+  assert.deepEqual(result.suppress, { address: true, reason: 'bounce' });
+  assert.equal(interpretEvent(base({ event: 'bounce', type: 'blocked', reason: '550 rejected', bounce_classification: 'Invalid Address' })).type, 'bounce');
+});
+
+test('isUnknownRecipient: the address, not the sender', () => {
+  for (const reason of [
+    '550 #5.1.0 Address rejected.',
+    '550 5.1.1 User Unknown',
+    '550 5.1.1 <a@b.com>: Recipient address rejected: User unknown in virtual mailbox table',
+    '550 No such user here',
+    '550 Requested action not taken: mailbox unavailable',
+    '554 5.1.10 Recipient address has null MX'
+  ]) assert.equal(isUnknownRecipient(reason), true, reason);
+  for (const reason of [
+    '554 5.7.1 Message rejected due to reputation',
+    '550 5.1.8 Sender address rejected: Domain not found',
+    '550 5.7.1 Recipient address rejected: client blocked using zen.spamhaus.org',
+    '550 5.7.1 Message rejected by policy',
+    '421 Too many connections',
+    '550 5.7.26 Unauthenticated email is not accepted (DMARC)',
+    '',
+    null
+  ]) assert.equal(isUnknownRecipient(reason), false, String(reason));
 });
 
 test('dropped: suppression follows the reason', () => {

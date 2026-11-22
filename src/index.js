@@ -8,6 +8,7 @@ export {
   interpretEvents,
   isMachineOpenTime,
   isTestEvent,
+  isUnknownRecipient,
   messageIdOf,
   readerIp
 } from './interpret.js';

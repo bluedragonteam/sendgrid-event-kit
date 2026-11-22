@@ -1,6 +1,6 @@
 {
   "name": "sendgrid-event-kit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Interpret SendGrid Event Webhook events (machine opens, sender blocks vs bounces, what to suppress), summarize per-message engagement, and verify Signed Event Webhook requests. No dependencies.",
   "license": "MIT",
   "type": "module",

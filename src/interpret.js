@@ -108,6 +108,26 @@ const dropSuppression = (reason) => {
   return NO_SUPPRESS;
 };
 
+// Replies about the recipient's address. SendGrid files some of these under "blocked" when it doesn't know the
+// receiver's wording (Proofpoint's "550 #5.1.0 Address rejected."), though the mailbox simply doesn't exist.
+// X.1.0-X.1.3, X.1.6 and X.1.10 are destination address codes (RFC 3463, RFC 7505); X.1.7 / X.1.8 are the sender's.
+const RECIPIENT_ADDRESS_CODE = /\b5\.1\.(?:[0-36]|10)\b/;
+const RECIPIENT_ADDRESS_TEXT = /\b(?:user|recipient|mailbox|address|account)\s+(?:unknown|not\s+found|does\s*n[o']t\s+exist|unavailable|disabled)\b|\bunknown\s+(?:user|recipient)\b|\bno\s+such\s+(?:user|mailbox|recipient)\b|\b(?:recipient|address)\s+rejected\b|\binvalid\s+(?:recipient|mailbox)\b|\bundeliverable\s+address\b|\bdoes\s*n[o']t\s+exist\b/i;
+// ...unless the reply is really about the sender or the message
+const ABOUT_THE_SENDER = /\bsender\b|reputation|\bspam|\bblock(?:ed|list)|blacklist|\blisted\b|spamhaus|\brbl\b|\bspf\b|\bdkim\b|\bdmarc\b|\bpolicy\b|\bcontent\b|rate\s*limit|too\s+many/i;
+
+/**
+ * Whether a rejection says the recipient's address doesn't exist (as opposed to the receiver refusing the sender).
+ * @param {string|null} reason the SMTP reply
+ * @param {string|null} [classification] SendGrid's bounce_classification
+ */
+export const isUnknownRecipient = (reason, classification = null) => {
+  if (classification === 'Invalid Address') return true;
+  const text = String(reason || '');
+  if (!text || ABOUT_THE_SENDER.test(text)) return false;
+  return RECIPIENT_ADDRESS_CODE.test(text) || RECIPIENT_ADDRESS_TEXT.test(text);
+};
+
 /**
  * Interpret one SendGrid Event Webhook event.
  *
@@ -170,8 +190,9 @@ export const interpretEvent = (event, options = {}) => {
       // A click proves the email was opened even when images were blocked and the open pixel never loaded
       return { ...result, type: 'click', ip: readerIp(source), url: typeof source.url === 'string' ? source.url : null, impliesOpen: true };
     case 'bounce':
-      // "blocked" is a rejection of the sender (reputation, content, volume), not proof the address is bad
-      if (source.type === 'blocked') {
+      // "blocked" is a rejection of the sender (reputation, content, volume), not proof the address is bad -
+      // unless the reply itself says the address doesn't exist
+      if (source.type === 'blocked' && !isUnknownRecipient(reason, source.bounce_classification)) {
         return { ...result, type: 'sender_block', reason: reason || 'rejected by the receiving server', classification: source.bounce_classification || null };
       }
       return { ...result, type: 'bounce', reason: reason || 'bounced', classification: source.bounce_classification || null, suppress: suppressFor('bounce') };

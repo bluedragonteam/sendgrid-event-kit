@@ -1,0 +1,31 @@
+{
+  "name": "sendgrid-event-kit",
+  "version": "1.0.0",
+  "description": "Interpret SendGrid Event Webhook events (machine opens, sender blocks vs bounces, what to suppress), summarize per-message engagement, and verify Signed Event Webhook requests. No dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./interpret": "./src/interpret.js",
+    "./summarize": "./src/summarize.js",
+    "./signature": "./src/signature.js"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "sendgrid",
+    "event-webhook",
+    "email",
+    "open-tracking",
+    "bounce",
+    "webhook-signature"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
